@@ -40,7 +40,7 @@ lays them out as glass cards that rise into place as you scroll. No API key, no 
 | Data (per city) | Drives |
 |---|---|
 | Temperature | The card's gradient, from cool blue at -5 °C to warm coral at 45 °C, and the big number |
-| Weather code | Icon and label: clear, partly cloudy, foggy, rain, snow, storm |
+| Weather code | Icon and label: clear, partly cloudy, foggy, rain, snow, showers, snow showers, storm |
 | Wind speed | Width of the wind bar, 0 to 60 km/h |
 | Relative humidity | Opacity of the humidity dot |
 
@@ -50,11 +50,8 @@ feels-like, humidity, wind, pressure and precipitation, then fades after four se
 The stamp in the bottom-left reads `live` or `fallback`, so the page never passes canned
 numbers off as real.
 
-> [!NOTE]
-> The request sends both `current_weather=true` and `current=...`, and Open-Meteo answers only
-> the first. Temperature, wind and conditions are live, but humidity, feels-like, pressure and
-> precipitation currently show their built-in defaults (60 %, temperature minus 1°, 1013 hPa,
-> 0 mm). Dropping `current_weather` from the query fixes it. Data is fetched once per page load.
+Every value comes from one Open-Meteo `current=` request per city, refreshed every ten
+minutes. If a refresh fails the last live numbers stay up and the stamp's age keeps counting.
 
 ## Run it
 

@@ -418,6 +418,7 @@
         stagger: 80,
       },
       quietZoneIdle: 4000,
+      refreshInterval: 10 * 60 * 1000,
       tempRange: { min: -5, max: 45 },
       windRange: { min: 0, max: 60, barMax: 80 },
       humidityRange: { min: 0, max: 100, opacityMin: 0.2, opacityMax: 1.0 },
@@ -430,7 +431,9 @@
       { max: 48, emoji: '\u2601\uFE0F', label: 'Foggy' },
       { max: 67, emoji: '\uD83C\uDF27\uFE0F', label: 'Rain' },
       { max: 77, emoji: '\u2744\uFE0F', label: 'Snow' },
-      { max: 99, emoji: '\uD83C\uDF27\uFE0F', label: 'Storm' },
+      { max: 82, emoji: '\uD83C\uDF26\uFE0F', label: 'Showers' },
+      { max: 86, emoji: '\uD83C\uDF28\uFE0F', label: 'Snow showers' },
+      { max: 99, emoji: '\u26C8\uFE0F', label: 'Storm' },
     ];
 
     let weatherData = [];
@@ -491,45 +494,47 @@
       }));
     }
 
-    async function fetchCity(city, index) {
+    async function fetchCity(city) {
       const params = new URLSearchParams({
         latitude: city.lat,
         longitude: city.lng,
-        current_weather: 'true',
         current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,surface_pressure',
       });
       const url = `https://api.open-meteo.com/v1/forecast?${params}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('API error');
       const data = await res.json();
-      const cur = data.current || {};
-      const cw = data.current_weather || {};
+      const cur = data.current;
+      if (!cur || cur.temperature_2m == null || cur.weather_code == null) throw new Error('Missing current data');
       return {
         city: city.name,
         lat: city.lat,
         lng: city.lng,
-        temperature: cur.temperature_2m ?? cw.temperature ?? C.fallbackTemps[index],
-        apparent: cur.apparent_temperature ?? (cur.temperature_2m ?? cw.temperature ?? C.fallbackTemps[index]) - 1,
-        humidity: cur.relative_humidity_2m ?? 60,
-        wind: cur.wind_speed_10m ?? cw.windspeed ?? 10,
-        pressure: cur.surface_pressure ?? 1013,
+        temperature: cur.temperature_2m,
+        apparent: cur.apparent_temperature ?? cur.temperature_2m,
+        humidity: cur.relative_humidity_2m,
+        wind: cur.wind_speed_10m,
+        pressure: cur.surface_pressure,
         precipitation: cur.precipitation ?? 0,
-        weatherCode: cur.weather_code ?? cw.weathercode ?? 0,
+        weatherCode: cur.weather_code,
       };
     }
 
     async function loadWeather() {
       try {
         const results = await Promise.all(
-          C.cities.map((city, i) => fetchCity(city, i))
+          C.cities.map((city) => fetchCity(city))
         );
         weatherData = results;
         isLive = true;
         lastFetchTime = Date.now();
       } catch {
-        weatherData = buildFallback();
-        isLive = false;
-        lastFetchTime = Date.now();
+        // On a failed refresh keep the last live numbers (the stamp's age keeps counting);
+        // only fall back to canned values when nothing live has loaded yet.
+        if (!isLive) {
+          weatherData = buildFallback();
+          lastFetchTime = Date.now();
+        }
       }
       renderAll();
     }
@@ -736,6 +741,9 @@
     }, { passive: true });
 
     setInterval(updateStamp, 1000);
+    setInterval(() => {
+      if (!document.getElementById('quiet-zone').classList.contains('active')) loadWeather();
+    }, C.refreshInterval);
     loadWeather();
   </script>
 </body>
